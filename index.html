@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Booth</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #fce4ec, #f8bbd9);
+            min-height: 100vh;
+            color: #6a1b9a;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #6a1b9a;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .filter-section, .layout-section {
+            margin-bottom: 20px;
+        }
+
+        .filter-section h3, .layout-section h3 {
+            color: #6a1b9a;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .filter-buttons, .layout-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn, .layout-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #6a1b9a;
+            background: white;
+            color: #6a1b9a;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        .filter-btn.active, .layout-btn.active {
+            background: #6a1b9a;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .camera-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto 20px;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .countdown {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4em;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            display: none;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .capture-btn {
+            background: linear-gradient(45deg, #e91e63, #9c27b0);
+            color: white;
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #9c27b0, #673ab7);
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .captured-photos {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 20px;
+            max-width: 280px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .grid-1 {
+            grid-template-columns: 1fr;
+        }
+
+        .grid-3 {
+            grid-template-rows: repeat(3, 1fr);
+            grid-template-columns: 1fr;
+        }
+
+        .photo-slot {
+            aspect-ratio: 4/3;
+            border: 2px dashed #6a1b9a;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6a1b9a;
+            font-size: 0.9em;
+            background: rgba(255, 255, 255, 0.5);
+            overflow: hidden;
+            min-height: 200px;
+        }
+
+        .photo-slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .message-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        #message-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #6a1b9a;
+            border-radius: 15px;
+            font-size: 1em;
+            color: #6a1b9a;
+            background: white;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        #message-input::placeholder {
+            color: #9c27b0;
+            opacity: 0.7;
+        }
+
+        .generate-section {
+            text-align: center;
+        }
+
+        .generate-btn {
+            background: linear-gradient(45deg, #ff4081, #e91e63);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            border-radius: 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .polaroid {
+            background: white;
+            padding: 20px;
+            padding-bottom: 60px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin: 20px auto;
+            max-width: 320px;
+            display: none;
+        }
+
+        .polaroid-photos {
+            margin-bottom: 20px;
+            display: grid;
+            gap: 6px;
+        }
+
+        .polaroid-photos.grid-1 {
+            grid-template-columns: 1fr;
+        }
+
+        .polaroid-photos.grid-3 {
+            grid-template-rows: repeat(3, 1fr);
+            grid-template-columns: 1fr;
+        }
+
+        .polaroid-photos img {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            border-radius: 6px;
+            min-height: 150px;
+        }
+
+        .polaroid-message {
+            text-align: center;
+            color: #6a1b9a;
+            font-size: 1.1em;
+            font-weight: bold;
+            min-height: 30px;
+            padding: 10px;
+        }
+
+        .download-btn {
+            background: linear-gradient(45deg, #4caf50, #8bc34a);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .filter-colored {
+            filter: saturate(1.2) contrast(1.1);
+        }
+
+        .filter-vintage {
+            filter: sepia(0.8) contrast(1.2) brightness(1.1) saturate(0.8);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-btn {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📸 Photo Booth</h1>
+        </div>
+
+        <div class="controls">
+            <div class="filter-section">
+                <h3>Choose Filter</h3>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="colored">Colored</button>
+                    <button class="filter-btn" data-filter="vintage">Vintage</button>
+                </div>
+            </div>
+
+            <div class="layout-section">
+                <h3>Grid Layout</h3>
+                <div class="layout-buttons">
+                    <button class="layout-btn" data-layout="1">Single</button>
+                    <button class="layout-btn active" data-layout="3">3 Grid</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="camera-section">
+            <div class="camera-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+                <div class="countdown" id="countdown"></div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="action-btn capture-btn" id="capture-btn">📷 Capture</button>
+                <button class="action-btn upload-btn" id="upload-btn">📁 Upload</button>
+            </div>
+            <input type="file" id="file-input" accept="image/*" multiple>
+
+            <div class="captured-photos grid-3" id="photo-grid">
+                <div class="photo-slot" data-slot="0">Photo 1</div>
+                <div class="photo-slot" data-slot="1">Photo 2</div>
+                <div class="photo-slot" data-slot="2">Photo 3</div>
+            </div>
+        </div>
+
+        <div class="message-section">
+            <h3 style="color: #6a1b9a; margin-bottom: 10px;">Add Message</h3>
+            <textarea id="message-input" placeholder="Write your message here..."></textarea>
+        </div>
+
+        <div class="generate-section">
+            <button class="generate-btn" id="generate-btn">Generate Polaroid</button>
+        </div>
+
+        <div class="polaroid" id="polaroid">
+            <div class="polaroid-photos" id="polaroid-photos"></div>
+            <div class="polaroid-message" id="polaroid-message"></div>
+        </div>
+
+        <div class="generate-section">
+            <button class="download-btn hidden" id="download-btn">💾 Download</button>
+        </div>
+    </div>
+
+    <script>
+        class PhotoBooth {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.countdown = document.getElementById('countdown');
+                
+                this.photos = [];
+                this.currentFilter = 'colored';
+                this.currentLayout = 3;
+                this.maxPhotos = 3;
+                
+                this.init();
+            }
+
+            async init() {
+                await this.setupCamera();
+                this.setupEventListeners();
+                this.updatePhotoGrid();
+            }
+
+            async setupCamera() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { 
+                            facingMode: 'user',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+                    this.video.srcObject = stream;
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    alert('Could not access camera. Please allow camera permissions or use upload option.');
+                }
+            }
+
+            setupEventListeners() {
+                // Filter buttons
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentFilter = e.target.dataset.filter;
+                        this.updateVideoFilter();
+                    });
+                });
+
+                // Layout buttons
+                document.querySelectorAll('.layout-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentLayout = parseInt(e.target.dataset.layout);
+                        this.maxPhotos = this.currentLayout;
+                        this.updatePhotoGrid();
+                    });
+                });
+
+                // Action buttons
+                document.getElementById('capture-btn').addEventListener('click', () => this.capturePhoto());
+                document.getElementById('upload-btn').addEventListener('click', () => document.getElementById('file-input').click());
+                document.getElementById('file-input').addEventListener('change', (e) => this.handleFileUpload(e));
+
+                // Generate and download
+                document.getElementById('generate-btn').addEventListener('click', () => this.generatePolaroid());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadPolaroid());
+
+                // Photo slot clicks for re-taking
+                document.querySelectorAll('.photo-slot').forEach(slot => {
+                    slot.addEventListener('click', (e) => {
+                        const slotIndex = parseInt(e.target.dataset.slot);
+                        if (this.photos[slotIndex]) {
+                            this.photos[slotIndex] = null;
+                            this.updatePhotoDisplay();
+                        }
+                    });
+                });
+            }
+
+            updateVideoFilter() {
+                this.video.className = `filter-${this.currentFilter}`;
+            }
+
+            updatePhotoGrid() {
+                const grid = document.getElementById('photo-grid');
+                grid.innerHTML = '';
+                grid.className = `captured-photos grid-${this.currentLayout}`;
+
+                for (let i = 0; i < this.maxPhotos; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'photo-slot';
+                    slot.dataset.slot = i;
+                    slot.textContent = `Photo ${i + 1}`;
+                    
+                    slot.addEventListener('click', (e) => {
+                        const slotIndex = parseInt(e.target.dataset.slot);
+                        if (this.photos[slotIndex]) {
+                            this.photos[slotIndex] = null;
+                            this.updatePhotoDisplay();
+                        }
+                    });
+                    
+                    grid.appendChild(slot);
+                }
+
+                // Reset photos array
+                this.photos = new Array(this.maxPhotos).fill(null);
+                this.updatePhotoDisplay();
+            }
+
+            async capturePhoto() {
+                const nextSlot = this.photos.findIndex(photo => photo === null);
+                if (nextSlot === -1) {
+                    alert('All photo slots are filled! Click on a photo to retake it.');
+                    return;
+                }
+
+                await this.showCountdown();
+                
+                this.canvas.width = this.video.videoWidth;
+                this.canvas.height = this.video.videoHeight;
+                
+                this.ctx.drawImage(this.video, 0, 0);
+                
+                const imageData = this.canvas.toDataURL('image/jpeg', 0.9);
+                this.photos[nextSlot] = imageData;
+                this.updatePhotoDisplay();
+            }
+
+            showCountdown() {
+                return new Promise((resolve) => {
+                    let count = 3;
+                    this.countdown.style.display = 'block';
+                    this.countdown.textContent = count;
+
+                    const countInterval = setInterval(() => {
+                        count--;
+                        if (count > 0) {
+                            this.countdown.textContent = count;
+                        } else {
+                            this.countdown.textContent = '📸';
+                            setTimeout(() => {
+                                this.countdown.style.display = 'none';
+                                clearInterval(countInterval);
+                                resolve();
+                            }, 200);
+                        }
+                    }, 1000);
+                });
+            }
+
+            handleFileUpload(event) {
+                const files = Array.from(event.target.files);
+                
+                files.forEach((file, index) => {
+                    const nextSlot = this.photos.findIndex(photo => photo === null);
+                    if (nextSlot === -1) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.photos[nextSlot] = e.target.result;
+                        this.updatePhotoDisplay();
+                    };
+                    reader.readAsDataURL(file);
+                });
+                
+                event.target.value = '';
+            }
+
+            updatePhotoDisplay() {
+                const slots = document.querySelectorAll('.photo-slot');
+                slots.forEach((slot, index) => {
+                    if (this.photos[index]) {
+                        const img = document.createElement('img');
+                        img.src = this.photos[index];
+                        img.className = `filter-${this.currentFilter}`;
+                        slot.innerHTML = '';
+                        slot.appendChild(img);
+                    } else {
+                        slot.innerHTML = `Photo ${index + 1}`;
+                    }
+                });
+            }
+
+            generatePolaroid() {
+                const filledPhotos = this.photos.filter(photo => photo !== null);
+                if (filledPhotos.length === 0) {
+                    alert('Please capture or upload at least one photo!');
+                    return;
+                }
+
+                const polaroid = document.getElementById('polaroid');
+                const polaroidPhotos = document.getElementById('polaroid-photos');
+                const polaroidMessage = document.getElementById('polaroid-message');
+                const messageInput = document.getElementById('message-input');
+
+                // Create photo grid
+                polaroidPhotos.innerHTML = '';
+                polaroidPhotos.className = `polaroid-photos grid-${this.currentLayout}`;
+
+                this.photos.forEach((photo, index) => {
+                    if (photo) {
+                        const img = document.createElement('img');
+                        img.src = photo;
+                        img.className = `filter-${this.currentFilter}`;
+                        polaroidPhotos.appendChild(img);
+                    }
+                });
+
+                // Add message
+                polaroidMessage.textContent = messageInput.value || '';
+
+                // Show polaroid and download button
+                polaroid.style.display = 'block';
+                document.getElementById('download-btn').classList.remove('hidden');
+
+                // Scroll to polaroid
+                polaroid.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            async downloadPolaroid() {
+                const polaroid = document.getElementById('polaroid');
+                
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set canvas size for vertical strip format
+                    canvas.width = 400;
+                    canvas.height = this.currentLayout === 1 ? 500 : 800;
+                    
+                    // Fill white background
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Add photos vertically
+                    const filledPhotos = this.photos.filter(photo => photo !== null);
+                    const photoWidth = 320;
+                    const photoHeight = 240;
+                    const startX = (canvas.width - photoWidth) / 2;
+                    const photoSpacing = 10;
+                    
+                    for (let i = 0; i < filledPhotos.length; i++) {
+                        const img = new Image();
+                        img.onload = () => {
+                            const y = 40 + i * (photoHeight + photoSpacing);
+                            
+                            ctx.drawImage(img, startX, y, photoWidth, photoHeight);
+                            
+                            // If this is the last image, add text and download
+                            if (i === filledPhotos.length - 1) {
+                                // Add message
+                                const message = document.getElementById('message-input').value;
+                                if (message) {
+                                    ctx.fillStyle = '#6a1b9a';
+                                    ctx.font = 'bold 20px Arial';
+                                    ctx.textAlign = 'center';
+                                    
+                                    const lines = this.wrapText(ctx, message, 350);
+                                    const messageStartY = 40 + filledPhotos.length * (photoHeight + photoSpacing) + 30;
+                                    lines.forEach((line, index) => {
+                                        ctx.fillText(line, canvas.width / 2, messageStartY + (index * 25));
+                                    });
+                                }
+                                
+                                // Download
+                                const link = document.createElement('a');
+                                link.download = `photo-booth-strip-${Date.now()}.png`;
+                                link.href = canvas.toDataURL();
+                                link.click();
+                            }
+                        };
+                        img.src = filledPhotos[i];
+                    }
+                } catch (error) {
+                    console.error('Download failed:', error);
+                    alert('Download failed. Please try again.');
+                }
+            }
+
+            wrapText(ctx, text, maxWidth) {
+                const words = text.split(' ');
+                const lines = [];
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    const word = words[i];
+                    const width = ctx.measureText(currentLine + " " + word).width;
+                    if (width < maxWidth) {
+                        currentLine += " " + word;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    }
+                }
+                lines.push(currentLine);
+                return lines;
+            }
+        }
+
+        // Initialize the photo booth when the page loads
+        window.addEventListener('load', () => {
+            new PhotoBooth();
+        });
+    </script>
+</body>
+</html>
