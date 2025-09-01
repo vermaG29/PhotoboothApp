@@ -620,15 +620,15 @@
             }
 
             async downloadPolaroid() {
-                const polaroid = document.getElementById('polaroid');
-                
                 try {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
                     // Set canvas size for vertical strip format
                     canvas.width = 400;
-                    canvas.height = this.currentLayout === 1 ? 500 : 800;
+                    const baseHeight = this.currentLayout === 1 ? 400 : 600;
+                    const messageHeight = 100;
+                    canvas.height = baseHeight + messageHeight;
                     
                     // Fill white background
                     ctx.fillStyle = 'white';
@@ -637,42 +637,56 @@
                     // Add photos vertically
                     const filledPhotos = this.photos.filter(photo => photo !== null);
                     const photoWidth = 320;
-                    const photoHeight = 240;
+                    const photoHeight = this.currentLayout === 1 ? 320 : 160;
                     const startX = (canvas.width - photoWidth) / 2;
                     const photoSpacing = 10;
                     
-                    for (let i = 0; i < filledPhotos.length; i++) {
-                        const img = new Image();
-                        img.onload = () => {
-                            const y = 40 + i * (photoHeight + photoSpacing);
-                            
-                            ctx.drawImage(img, startX, y, photoWidth, photoHeight);
-                            
-                            // If this is the last image, add text and download
-                            if (i === filledPhotos.length - 1) {
-                                // Add message
-                                const message = document.getElementById('message-input').value;
-                                if (message) {
-                                    ctx.fillStyle = '#6a1b9a';
-                                    ctx.font = 'bold 20px Arial';
-                                    ctx.textAlign = 'center';
-                                    
-                                    const lines = this.wrapText(ctx, message, 350);
-                                    const messageStartY = 40 + filledPhotos.length * (photoHeight + photoSpacing) + 30;
-                                    lines.forEach((line, index) => {
-                                        ctx.fillText(line, canvas.width / 2, messageStartY + (index * 25));
-                                    });
+                    // Load all images and wait for them
+                    const imagePromises = filledPhotos.map((photoSrc, i) => {
+                        return new Promise((resolve) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                const y = 40 + i * (photoHeight + photoSpacing);
+                                
+                                // Apply filter if needed
+                                if (this.currentFilter === 'vintage') {
+                                    ctx.filter = 'sepia(0.8) contrast(1.2) brightness(1.1) saturate(0.8)';
+                                } else {
+                                    ctx.filter = 'saturate(1.2) contrast(1.1)';
                                 }
                                 
-                                // Download
-                                const link = document.createElement('a');
-                                link.download = `photo-booth-strip-${Date.now()}.png`;
-                                link.href = canvas.toDataURL();
-                                link.click();
-                            }
-                        };
-                        img.src = filledPhotos[i];
+                                ctx.drawImage(img, startX, y, photoWidth, photoHeight);
+                                ctx.filter = 'none'; // Reset filter
+                                resolve();
+                            };
+                            img.onerror = () => resolve(); // Continue even if image fails
+                            img.src = photoSrc;
+                        });
+                    });
+                    
+                    // Wait for all images to load
+                    await Promise.all(imagePromises);
+                    
+                    // Add message after all images are loaded
+                    const message = document.getElementById('message-input').value;
+                    if (message) {
+                        ctx.fillStyle = '#6a1b9a';
+                        ctx.font = 'bold 24px Arial';
+                        ctx.textAlign = 'center';
+                        
+                        const lines = this.wrapText(ctx, message, 350);
+                        const messageStartY = 40 + filledPhotos.length * (photoHeight + photoSpacing) + 40;
+                        lines.forEach((line, index) => {
+                            ctx.fillText(line, canvas.width / 2, messageStartY + (index * 30));
+                        });
                     }
+                    
+                    // Download the final image
+                    const link = document.createElement('a');
+                    link.download = `photo-booth-strip-${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png', 1.0);
+                    link.click();
+                    
                 } catch (error) {
                     console.error('Download failed:', error);
                     alert('Download failed. Please try again.');
