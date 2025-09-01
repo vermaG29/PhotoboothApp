@@ -621,71 +621,122 @@
 
             async downloadPolaroid() {
                 try {
+                    const filledPhotos = this.photos.filter(photo => photo !== null);
+                    if (filledPhotos.length === 0) return;
+
+                    // Create high-resolution canvas
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
-                    // Set canvas size for vertical strip format
-                    canvas.width = 400;
-                    const baseHeight = this.currentLayout === 1 ? 400 : 600;
-                    const messageHeight = 100;
-                    canvas.height = baseHeight + messageHeight;
+                    // High resolution settings
+                    const dpr = window.devicePixelRatio || 1;
+                    const canvasWidth = 400;
+                    let totalHeight = 80; // Top padding
                     
-                    // Fill white background
+                    // Calculate dimensions first by loading one image
+                    const testImg = new Image();
+                    await new Promise((resolve) => {
+                        testImg.onload = resolve;
+                        testImg.src = filledPhotos[0];
+                    });
+                    
+                    // Use original image aspect ratio
+                    const imgAspect = testImg.width / testImg.height;
+                    const photoWidth = 350;
+                    const photoHeight = photoWidth / imgAspect;
+                    const spacing = 15;
+                    
+                    // Calculate total height needed
+                    totalHeight += filledPhotos.length * photoHeight;
+                    totalHeight += (filledPhotos.length - 1) * spacing;
+                    totalHeight += 150; // Bottom space for message
+                    
+                    // Set canvas size
+                    canvas.width = canvasWidth * dpr;
+                    canvas.height = totalHeight * dpr;
+                    canvas.style.width = canvasWidth + 'px';
+                    canvas.style.height = totalHeight + 'px';
+                    
+                    // Scale context for high DPI
+                    ctx.scale(dpr, dpr);
+                    
+                    // White background
                     ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillRect(0, 0, canvasWidth, totalHeight);
                     
-                    // Add photos vertically
-                    const filledPhotos = this.photos.filter(photo => photo !== null);
-                    const photoWidth = 320;
-                    const photoHeight = this.currentLayout === 1 ? 320 : 160;
-                    const startX = (canvas.width - photoWidth) / 2;
-                    const photoSpacing = 10;
+                    // Draw border
+                    ctx.strokeStyle = '#e0e0e0';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(10, 10, canvasWidth - 20, totalHeight - 20);
                     
-                    // Load all images and wait for them
-                    const imagePromises = filledPhotos.map((photoSrc, i) => {
-                        return new Promise((resolve) => {
+                    // Load and draw all images with proper quality
+                    let currentY = 40;
+                    const photoX = (canvasWidth - photoWidth) / 2;
+                    
+                    for (let i = 0; i < filledPhotos.length; i++) {
+                        await new Promise((resolve) => {
                             const img = new Image();
                             img.onload = () => {
-                                const y = 40 + i * (photoHeight + photoSpacing);
+                                // Disable smoothing for crisp images
+                                ctx.imageSmoothingEnabled = true;
+                                ctx.imageSmoothingQuality = 'high';
                                 
-                                // Apply filter if needed
+                                // Apply filter
                                 if (this.currentFilter === 'vintage') {
                                     ctx.filter = 'sepia(0.8) contrast(1.2) brightness(1.1) saturate(0.8)';
                                 } else {
                                     ctx.filter = 'saturate(1.2) contrast(1.1)';
                                 }
                                 
-                                ctx.drawImage(img, startX, y, photoWidth, photoHeight);
-                                ctx.filter = 'none'; // Reset filter
+                                // Draw image with original quality
+                                ctx.drawImage(img, photoX, currentY, photoWidth, photoHeight);
+                                ctx.filter = 'none';
+                                
+                                currentY += photoHeight + spacing;
                                 resolve();
                             };
-                            img.onerror = () => resolve(); // Continue even if image fails
-                            img.src = photoSrc;
+                            img.src = filledPhotos[i];
                         });
-                    });
+                    }
                     
-                    // Wait for all images to load
-                    await Promise.all(imagePromises);
-                    
-                    // Add message after all images are loaded
+                    // Add message with better formatting
                     const message = document.getElementById('message-input').value;
                     if (message) {
                         ctx.fillStyle = '#6a1b9a';
                         ctx.font = 'bold 24px Arial';
                         ctx.textAlign = 'center';
+                        ctx.textBaseline = 'top';
                         
-                        const lines = this.wrapText(ctx, message, 350);
-                        const messageStartY = 40 + filledPhotos.length * (photoHeight + photoSpacing) + 40;
+                        const lines = this.wrapText(ctx, message, photoWidth - 40);
                         lines.forEach((line, index) => {
-                            ctx.fillText(line, canvas.width / 2, messageStartY + (index * 30));
+                            ctx.fillText(line, canvasWidth / 2, currentY + 20 + (index * 30));
                         });
                     }
                     
-                    // Download the final image
-                    const link = document.createElement('a');
-                    link.download = `photo-booth-strip-${Date.now()}.png`;
-                    link.href = canvas.toDataURL('image/png', 1.0);
-                    link.click();
+                    // Convert to blob for better quality
+                    canvas.toBlob((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.download = `photo-booth-${Date.now()}.png`;
+                        link.href = url;
+                        
+                        // Handle mobile differently
+                        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                            // Mobile: Show image in new window
+                            const newWindow = window.open(url, '_blank');
+                            setTimeout(() => {
+                                alert('Image opened in new tab. Long press on the image and select "Save to Photos" or "Download"');
+                            }, 1000);
+                        } else {
+                            // Desktop: Direct download
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                        
+                        // Clean up
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    }, 'image/png', 1.0);
                     
                 } catch (error) {
                     console.error('Download failed:', error);
