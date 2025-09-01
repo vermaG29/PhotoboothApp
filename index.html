@@ -630,8 +630,8 @@
                     
                     // High resolution settings
                     const dpr = window.devicePixelRatio || 1;
-                    const canvasWidth = 400;
-                    let totalHeight = 80; // Top padding
+                    const canvasWidth = 1200;
+                    let totalHeight = 200; // Top padding
                     
                     // Calculate dimensions first by loading one image
                     const testImg = new Image();
@@ -641,8 +641,9 @@
                     });
                     
                     // Use original image aspect ratio
+                    const maxPhotoWidth = canvasWidth-100; 
                     const imgAspect = testImg.width / testImg.height;
-                    const photoWidth = 350;
+                    const photoWidth = Math.min(maxPhotoWidth, testImg.width);
                     const photoHeight = photoWidth / imgAspect;
                     const spacing = 15;
                     
