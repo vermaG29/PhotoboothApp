@@ -624,123 +624,108 @@
                     const filledPhotos = this.photos.filter(photo => photo !== null);
                     if (filledPhotos.length === 0) return;
 
-                    // Create high-resolution canvas
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
-                    // High resolution settings
-                    const dpr = window.devicePixelRatio || 1;
-                    const canvasWidth = 400;
-                    let totalHeight = 80; // Top padding
+                    // Load all images first to get their natural dimensions
+                    const loadedImages = await Promise.all(
+                        filledPhotos.map(photoSrc => new Promise((resolve) => {
+                            const img = new Image();
+                            img.onload = () => resolve(img);
+                            img.onerror = () => resolve(null);
+                            img.src = photoSrc;
+                        }))
+                    );
                     
-                    // Calculate dimensions first by loading one image
-                    const testImg = new Image();
-                    await new Promise((resolve) => {
-                        testImg.onload = resolve;
-                        testImg.src = filledPhotos[0];
+                    const validImages = loadedImages.filter(img => img !== null);
+                    if (validImages.length === 0) return;
+                    
+                    // Calculate canvas dimensions based on largest image
+                    const maxWidth = Math.max(...validImages.map(img => img.width));
+                    const canvasWidth = Math.min(maxWidth, 800); // Cap at 800px wide
+                    
+                    // Calculate proportional heights
+                    const imageHeights = validImages.map(img => {
+                        const ratio = canvasWidth * 0.9 / img.width; // 90% of canvas width
+                        return img.height * ratio;
                     });
                     
-                    // Use original image aspect ratio
-                    const imgAspect = testImg.width / testImg.height;
-                    const photoWidth = 350;
-                    const photoHeight = photoWidth / imgAspect;
-                    const spacing = 15;
+                    const totalImageHeight = imageHeights.reduce((sum, h) => sum + h, 0);
+                    const spacing = 20;
+                    const padding = 40;
+                    const messageSpace = 80;
                     
-                    // Calculate total height needed
-                    totalHeight += filledPhotos.length * photoHeight;
-                    totalHeight += (filledPhotos.length - 1) * spacing;
-                    totalHeight += 150; // Bottom space for message
+                    const canvasHeight = padding * 2 + totalImageHeight + (spacing * (validImages.length - 1)) + messageSpace;
                     
                     // Set canvas size
-                    canvas.width = canvasWidth * dpr;
-                    canvas.height = totalHeight * dpr;
-                    canvas.style.width = canvasWidth + 'px';
-                    canvas.style.height = totalHeight + 'px';
-                    
-                    // Scale context for high DPI
-                    ctx.scale(dpr, dpr);
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
                     
                     // White background
                     ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvasWidth, totalHeight);
+                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
                     
-                    // Draw border
-                    ctx.strokeStyle = '#e0e0e0';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(10, 10, canvasWidth - 20, totalHeight - 20);
+                    // Draw images maintaining their aspect ratios
+                    let currentY = padding;
+                    const imageWidth = canvasWidth * 0.9;
+                    const imageX = (canvasWidth - imageWidth) / 2;
                     
-                    // Load and draw all images with proper quality
-                    let currentY = 40;
-                    const photoX = (canvasWidth - photoWidth) / 2;
-                    
-                    for (let i = 0; i < filledPhotos.length; i++) {
-                        await new Promise((resolve) => {
-                            const img = new Image();
-                            img.onload = () => {
-                                // Disable smoothing for crisp images
-                                ctx.imageSmoothingEnabled = true;
-                                ctx.imageSmoothingQuality = 'high';
-                                
-                                // Apply filter
-                                if (this.currentFilter === 'vintage') {
-                                    ctx.filter = 'sepia(0.8) contrast(1.2) brightness(1.1) saturate(0.8)';
-                                } else {
-                                    ctx.filter = 'saturate(1.2) contrast(1.1)';
-                                }
-                                
-                                // Draw image with original quality
-                                ctx.drawImage(img, photoX, currentY, photoWidth, photoHeight);
-                                ctx.filter = 'none';
-                                
-                                currentY += photoHeight + spacing;
-                                resolve();
-                            };
-                            img.src = filledPhotos[i];
-                        });
+                    for (let i = 0; i < validImages.length; i++) {
+                        const img = validImages[i];
+                        const imgHeight = imageHeights[i];
+                        
+                        // Apply filter
+                        if (this.currentFilter === 'vintage') {
+                            ctx.filter = 'sepia(0.8) contrast(1.2) brightness(1.1) saturate(0.8)';
+                        } else {
+                            ctx.filter = 'saturate(1.2) contrast(1.1)';
+                        }
+                        
+                        // Draw image with proper aspect ratio
+                        ctx.drawImage(img, imageX, currentY, imageWidth, imgHeight);
+                        ctx.filter = 'none';
+                        
+                        currentY += imgHeight + spacing;
                     }
                     
-                    // Add message with better formatting
+                    // Add message
                     const message = document.getElementById('message-input').value;
                     if (message) {
                         ctx.fillStyle = '#6a1b9a';
-                        ctx.font = 'bold 24px Arial';
+                        ctx.font = 'bold 32px Arial';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'top';
                         
-                        const lines = this.wrapText(ctx, message, photoWidth - 40);
+                        const lines = this.wrapText(ctx, message, imageWidth);
                         lines.forEach((line, index) => {
-                            ctx.fillText(line, canvasWidth / 2, currentY + 20 + (index * 30));
+                            ctx.fillText(line, canvasWidth / 2, currentY + 20 + (index * 40));
                         });
                     }
                     
-                    // Convert to blob for better quality
+                    // Create download link
                     canvas.toBlob((blob) => {
                         const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.download = `photo-booth-${Date.now()}.png`;
-                        link.href = url;
                         
-                        // Handle mobile differently
-                        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                            // Mobile: Show image in new window
-                            const newWindow = window.open(url, '_blank');
-                            setTimeout(() => {
-                                alert('Image opened in new tab. Long press on the image and select "Save to Photos" or "Download"');
-                            }, 1000);
-                        } else {
-                            // Desktop: Direct download
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        }
+                        // Create download link
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `photobooth-${Date.now()}.png`;
+                        
+                        // Trigger download
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        // Show success message
+                        alert('Photo booth strip downloaded successfully!');
                         
                         // Clean up
-                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        setTimeout(() => URL.revokeObjectURL(url), 100);
                     }, 'image/png', 1.0);
                     
                 } catch (error) {
                     console.error('Download failed:', error);
-                    alert('Download failed. Please try again.');
+                    alert('Download failed: ' + error.message);
                 }
             }
 
